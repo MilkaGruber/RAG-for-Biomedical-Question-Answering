@@ -28,3 +28,15 @@ print("D:", example["opd"])
 
 print("\nCorrect answer:")
 print(example["cop"])
+
+for i in range(10):
+    example = dataset["train"][i]
+
+    print("\n--------------------")
+    print("Question:", example["question"])
+    print("A:", example["opa"])
+    print("B:", example["opb"])
+    print("C:", example["opc"])
+    print("D:", example["opd"])
+    print("cop:", example["cop"])
+    
