@@ -1,0 +1,7 @@
+{
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "num_documents": null,
+  "corpus_size": 125847,
+  "corpus_fingerprint": "d87a2ceba274c625",
+  "normalize_embeddings": true
+}
