@@ -1,0 +1,202 @@
+
+============================================================
+RUN TIME: 2026-08-16T18:59:52.375058+02:00
+
+EXPERIMENT PARAMETERS
+----------------------------
+embedding_model: sentence-transformers/all-MiniLM-L6-v2
+model_name: Qwen/Qwen2.5-1.5B-Instruct
+num_questions: 10
+num_documents: None
+top_k: 5
+seed: 42
+index_file: textbook_faiss.index
+results_file: rag_results.json
+
+COMPARISON RESULTS
+----------------------------
+Questions:           10
+Qwen correct:        7
+Qwen accuracy:       70.00%
+Qwen + RAG correct:  6
+Qwen + RAG accuracy: 60.00%
+Accuracy difference: -10.00%
+RAG fixed answers:   2
+RAG broke answers:   3
+
+============================================================
+RUN TIME: 2026-08-16T19:06:24.090953+02:00
+
+EXPERIMENT PARAMETERS
+----------------------------
+embedding_model: sentence-transformers/all-MiniLM-L6-v2
+model_name: Qwen/Qwen2.5-1.5B-Instruct
+num_questions: 10
+num_documents: None
+top_k_values: [1, 3, 5, 10]
+seed: 42
+index_file: textbook_faiss.index
+results_file: rag_results.json
+
+COMPARISON RESULTS
+----------------------------
+Questions:           10
+Qwen correct:        7
+Qwen accuracy:       70.00%
+
+RAG k=1
+Correct:             4
+Accuracy:            40.00%
+Accuracy difference: -30.00%
+Fixed answers:       0
+Broke answers:       3
+
+RAG k=3
+Correct:             6
+Accuracy:            60.00%
+Accuracy difference: -10.00%
+Fixed answers:       2
+Broke answers:       3
+
+RAG k=5
+Correct:             6
+Accuracy:            60.00%
+Accuracy difference: -10.00%
+Fixed answers:       2
+Broke answers:       3
+
+RAG k=10
+Correct:             6
+Accuracy:            60.00%
+Accuracy difference: -10.00%
+Fixed answers:       3
+Broke answers:       4
+
+============================================================
+RUN TIME: 2026-08-16T19:24:01.815813+02:00
+
+EXPERIMENT PARAMETERS
+----------------------------
+embedding_model: sentence-transformers/all-MiniLM-L6-v2
+model_name: Qwen/Qwen2.5-1.5B-Instruct
+num_questions: 50
+num_documents: None
+top_k_values: [1, 3, 5, 10, 15]
+seed: 42
+index_file: textbook_faiss.index
+results_file: rag_results.json
+
+COMPARISON RESULTS
+----------------------------
+Questions:           50
+Qwen correct:        20
+Qwen accuracy:       40.00%
+
+RAG k=1
+Correct:             15
+Accuracy:            30.00%
+Accuracy difference: -10.00%
+Fixed answers:       3
+Broke answers:       8
+
+RAG k=3
+Correct:             22
+Accuracy:            44.00%
+Accuracy difference: 4.00%
+Fixed answers:       9
+Broke answers:       7
+
+RAG k=5
+Correct:             24
+Accuracy:            48.00%
+Accuracy difference: 8.00%
+Fixed answers:       10
+Broke answers:       6
+
+RAG k=10
+Correct:             24
+Accuracy:            48.00%
+Accuracy difference: 8.00%
+Fixed answers:       10
+Broke answers:       6
+
+RAG k=15
+Correct:             18
+Accuracy:            36.00%
+Accuracy difference: -4.00%
+Fixed answers:       5
+Broke answers:       7
+
+============================================================
+RUN TIME: 2026-08-17T13:54:33.599760+02:00
+
+EXPERIMENT NOTES
+----------------------------
+- at this point I've fixed retrieval, so it no longer contain A, B, C, D, 
+just text based question + answers, we observed a small improvement across all k's
+
+EXPERIMENT PARAMETERS
+----------------------------
+embedding_model: sentence-transformers/all-MiniLM-L6-v2
+model_name: Qwen/Qwen2.5-1.5B-Instruct
+num_questions: None
+num_documents: None
+top_k_values: [1, 3, 5, 8, 10, 12, 15]
+seed: 42
+index_file: textbook_faiss.index
+results_file: rag_results.json
+
+COMPARISON RESULTS
+----------------------------
+Questions:           4183
+Qwen correct:        1833
+Qwen accuracy:       43.82%
+
+RAG k=1
+Correct:             1800
+Accuracy:            43.03%
+Accuracy difference: -0.79%
+Fixed answers:       522
+Broke answers:       555
+
+RAG k=3
+Correct:             1902
+Accuracy:            45.47%
+Accuracy difference: 1.65%
+Fixed answers:       608
+Broke answers:       539
+
+RAG k=5
+Correct:             1939
+Accuracy:            46.35%
+Accuracy difference: 2.53%
+Fixed answers:       630
+Broke answers:       524
+
+RAG k=8
+Correct:             1958
+Accuracy:            46.81%
+Accuracy difference: 2.99%
+Fixed answers:       635
+Broke answers:       510
+
+RAG k=10
+Correct:             1943
+Accuracy:            46.45%
+Accuracy difference: 2.63%
+Fixed answers:       632
+Broke answers:       522
+
+RAG k=12
+Correct:             1964
+Accuracy:            46.95%
+Accuracy difference: 3.13%
+Fixed answers:       662
+Broke answers:       531
+
+RAG k=15
+Correct:             1967
+Accuracy:            47.02%
+Accuracy difference: 3.20%
+Fixed answers:       660
+Broke answers:       526
