@@ -203,6 +203,17 @@ def build_question_prompt(example):
     )
 
 
+def build_retrieval_query(example):
+    """Build a content-only query for semantic retrieval."""
+    return (
+        f"{example['question']}\n"
+        f"{example['opa']}\n"
+        f"{example['opb']}\n"
+        f"{example['opc']}\n"
+        f"{example['opd']}"
+    )
+
+
 def build_rag_prompt(example, retrieved_documents):
     context = "\n\n".join(
         result["document"]["content"]
@@ -295,8 +306,9 @@ def evaluate_qwen_and_rag(
         if baseline_is_correct:
             baseline_correct += 1
 
+        retrieval_query = build_retrieval_query(example)
         retrieved_documents = retrieve_documents(
-            baseline_prompt,
+            retrieval_query,
             index,
             corpus,
             embedding_model,
