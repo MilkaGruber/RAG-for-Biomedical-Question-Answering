@@ -31,6 +31,7 @@ def load_config(config_path):
         "num_questions",
         "num_documents",
         "top_k_values",
+        "question_only",
         "seed",
         "index_file",
         "results_file",
@@ -50,6 +51,9 @@ def load_config(config_path):
         raise ValueError("top_k_values must be a non-empty list of positive integers.")
 
     config["top_k_values"] = sorted(set(top_k_values))
+
+    if not isinstance(config["question_only"], bool):
+        raise ValueError("question_only must be true or false.")
 
     return config
 
@@ -203,8 +207,11 @@ def build_question_prompt(example):
     )
 
 
-def build_retrieval_query(example):
+def build_retrieval_query(example, question_only=False):
     """Build a content-only query for semantic retrieval."""
+    if question_only:
+        return example["question"]
+
     return (
         f"{example['question']}\n"
         f"{example['opa']}\n"
@@ -283,6 +290,7 @@ def evaluate_qwen_and_rag(
     tokenizer,
     model,
     k_values,
+    question_only,
 ):
     baseline_correct = 0
     rag_counts = {
@@ -306,7 +314,7 @@ def evaluate_qwen_and_rag(
         if baseline_is_correct:
             baseline_correct += 1
 
-        retrieval_query = build_retrieval_query(example)
+        retrieval_query = build_retrieval_query(example, question_only)
         retrieved_documents = retrieve_documents(
             retrieval_query,
             index,
@@ -457,6 +465,7 @@ def main(config):
         tokenizer,
         model,
         k_values=config["top_k_values"],
+        question_only=config["question_only"],
     )
 
     results["run_time"] = datetime.now().astimezone().isoformat()
