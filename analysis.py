@@ -97,14 +97,36 @@ def write_csv(path, cases, k):
             })
 
 
-def write_markdown(path, run, cases, k):
+def markdown_cell(value):
+    if value is None:
+        return "N/A"
+    if isinstance(value, (list, dict)):
+        value = json.dumps(value, ensure_ascii=False)
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def write_markdown(path, run, cases, k, results_path, run_index):
+    config = run.get("config", {})
     lines = [
         "# RAG corruption review", "",
+        f"- Source results: `{results_path}`",
+        f"- Requested run index: `{run_index}`",
         f"- Run time: {run.get('run_time', 'unknown')}",
         f"- Experiment size: {run.get('questions', 'unknown')} questions",
-        f"- RAG setting: k={k}", f"- Corrupted answers: {len(cases)}", "",
-        "## Coding guide", "", "Choose one primary category in the CSV:", "",
+        f"- RAG setting: k={k}",
+        f"- Question-only retrieval: `{config.get('question_only', 'unknown')}`",
+        f"- Corrupted answers: {len(cases)}", "",
+        "## Run configuration", "",
+        "| Parameter | Value |", "|---|---|",
     ]
+    lines.extend(
+        f"| {markdown_cell(parameter)} | {markdown_cell(value)} |"
+        for parameter, value in config.items()
+    )
+    lines.extend([
+        "",
+        "## Coding guide", "", "Choose one primary category in the CSV:", "",
+    ])
     lines.extend(f"- {category}" for category in CATEGORIES)
     lines.extend([
         "", "First decide whether the needed fact occurs in the retrieved passages. "
@@ -165,12 +187,13 @@ def main():
         summary_path = stem.with_name(stem.name + "_summary").with_suffix(".md")
         summarize(csv_path, summary_path)
         return
-    run = load_run(Path(args.results), args.run)
+    results_path = Path(args.results)
+    run = load_run(results_path, args.run)
     k = resolve_k(run, args.k)
     cases = corrupted_cases(run, k)
     markdown_path = stem.with_suffix(".md")
     write_csv(csv_path, cases, k)
-    write_markdown(markdown_path, run, cases, k)
+    write_markdown(markdown_path, run, cases, k, results_path, args.run)
     expected = run["rag_by_k"][str(k)].get("broke_answers")
     print(f"Extracted {len(cases)} corrupted answers for k={k}.")
     if expected is not None and expected != len(cases):

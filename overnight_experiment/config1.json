@@ -1,0 +1,14 @@
+{
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
+  "num_questions": null,
+  "num_documents": null,
+  "top_k_values": [1, 3, 5, 8, 10, 15, 18, 20],
+  "question_only": true,
+  "document_field": "content",
+  "max_input_tokens": 32768,
+  "baseline_cache_file": "baseline_predictions.json",
+  "seed": 42,
+  "index_file": "textbook_faiss.index",
+  "results_file": "rag_results.json"
+}
