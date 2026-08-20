@@ -19,10 +19,20 @@ CATEGORIES = [
     "other",
 ]
 
+FIXED_CATEGORIES = [
+    "direct answer found",
+    "useful supporting evidence",
+    "context helped reject a wrong option",
+    "multiple passages combined",
+    "correct despite weak retrieval",
+    "ambiguous question / questionable gold label",
+    "other",
+]
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description="Export baseline-correct/RAG-wrong cases for manual analysis."
+        description="Export corrupted and fixed RAG cases for manual analysis."
     )
     parser.add_argument("--results", default="rag_results.json")
     parser.add_argument("--run", type=int, default=-1,
@@ -69,6 +79,15 @@ def corrupted_cases(run, k):
     return cases
 
 
+def fixed_cases(run, k):
+    cases = []
+    for detail in run.get("evaluation_details", []):
+        rag = detail.get("rag_by_k", {}).get(str(k))
+        if rag and rag.get("outcome") == "fixed":
+            cases.append(detail)
+    return cases
+
+
 def option_text(case, letter):
     if letter is None:
         return "(no valid answer)"
@@ -94,6 +113,30 @@ def write_csv(path, cases, k):
                 "rag_letter": rag_letter, "rag_option": option_text(case, rag_letter),
                 "failure_category": "", "retrieval_contains_answer": "",
                 "misleading_document_rank": "", "notes": "",
+            })
+
+
+def write_fixed_csv(path, cases, k):
+    fields = [
+        "question_id", "k", "subject", "topic", "question", "gold_letter",
+        "gold_option", "baseline_letter", "baseline_option", "rag_letter",
+        "rag_option", "success_category", "supporting_document_rank", "notes",
+    ]
+    with path.open("w", encoding="utf-8-sig", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fields)
+        writer.writeheader()
+        for case in cases:
+            baseline_letter = case.get("baseline", {}).get("prediction")
+            rag_letter = case["rag_by_k"][str(k)].get("prediction")
+            writer.writerow({
+                "question_id": case.get("question_id"), "k": k,
+                "subject": case.get("subject_name"), "topic": case.get("topic_name"),
+                "question": case.get("question"), "gold_letter": case.get("expected"),
+                "gold_option": option_text(case, case.get("expected")),
+                "baseline_letter": baseline_letter,
+                "baseline_option": option_text(case, baseline_letter),
+                "rag_letter": rag_letter, "rag_option": option_text(case, rag_letter),
+                "success_category": "", "supporting_document_rank": "", "notes": "",
             })
 
 
@@ -161,6 +204,70 @@ def write_markdown(path, run, cases, k, results_path, run_index):
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def write_fixed_markdown(path, run, cases, k, results_path, run_index):
+    config = run.get("config", {})
+    lines = [
+        "# RAG fixed-answer review", "",
+        f"- Source results: `{results_path}`",
+        f"- Requested run index: `{run_index}`",
+        f"- Run time: {run.get('run_time', 'unknown')}",
+        f"- Experiment size: {run.get('questions', 'unknown')} questions",
+        f"- RAG setting: k={k}",
+        f"- Question-only retrieval: `{config.get('question_only', 'unknown')}`",
+        f"- Fixed answers: {len(cases)}", "",
+        "## Run configuration", "",
+        "| Parameter | Value |", "|---|---|",
+    ]
+    lines.extend(
+        f"| {markdown_cell(parameter)} | {markdown_cell(value)} |"
+        for parameter, value in config.items()
+    )
+    lines.extend([
+        "", "## Coding guide", "",
+        "Choose one primary success category in the CSV:", "",
+    ])
+    lines.extend(f"- {category}" for category in FIXED_CATEGORIES)
+    lines.extend([
+        "", "Decide whether the retrieved passages contain the fact needed for the "
+        "correct answer and how that information helped the model.", "",
+    ])
+    for number, case in enumerate(cases, 1):
+        baseline = case.get("baseline", {})
+        rag = case["rag_by_k"][str(k)]
+        gold = case.get("expected")
+        baseline_letter = baseline.get("prediction")
+        rag_letter = rag.get("prediction")
+        lines.extend([
+            f"## {number}. Question {case.get('question_id', 'unknown')}", "",
+            f"**Subject/topic:** {case.get('subject_name') or 'unknown'} / "
+            f"{case.get('topic_name') or 'unknown'}", "",
+            case.get("question", "Question text unavailable."), "",
+        ])
+        lines.extend(
+            f"- {letter}. {text}" for letter, text in case.get("options", {}).items()
+        )
+        lines.extend([
+            "", f"**Gold answer:** {gold}. {option_text(case, gold)}  ",
+            f"**Baseline answer:** {baseline_letter}. "
+            f"{option_text(case, baseline_letter)}  ",
+            f"**RAG answer:** {rag_letter}. {option_text(case, rag_letter)}  ",
+            f"**Raw baseline output:** `{baseline.get('raw_answer')}`  ",
+            f"**Raw RAG output:** `{rag.get('raw_answer')}`", "",
+            "### Retrieved passages", "",
+        ])
+        for document in case.get("retrieved_documents", [])[:k]:
+            lines.extend([
+                f"#### Rank {document.get('rank')}: "
+                f"{document.get('title', 'untitled')} "
+                f"(similarity {document.get('similarity', 0):.4f})", "",
+                document.get("content", "Passage content unavailable."), "",
+            ])
+        if case.get("dataset_explanation"):
+            lines.extend(["**Dataset explanation:** " + case["dataset_explanation"], ""])
+        lines.extend(["---", ""])
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def summarize(csv_path, output_path):
     with csv_path.open("r", encoding="utf-8-sig", newline="") as file:
         rows = list(csv.DictReader(file))
@@ -191,15 +298,29 @@ def main():
     run = load_run(results_path, args.run)
     k = resolve_k(run, args.k)
     cases = corrupted_cases(run, k)
+    fixed = fixed_cases(run, k)
     markdown_path = stem.with_suffix(".md")
     write_csv(csv_path, cases, k)
     write_markdown(markdown_path, run, cases, k, results_path, args.run)
+    fixed_stem = stem.with_name(stem.name + "_fixed")
+    fixed_csv_path = fixed_stem.with_suffix(".csv")
+    fixed_markdown_path = fixed_stem.with_suffix(".md")
+    write_fixed_csv(fixed_csv_path, fixed, k)
+    write_fixed_markdown(
+        fixed_markdown_path, run, fixed, k, results_path, args.run
+    )
     expected = run["rag_by_k"][str(k)].get("broke_answers")
     print(f"Extracted {len(cases)} corrupted answers for k={k}.")
     if expected is not None and expected != len(cases):
         print(f"Warning: aggregate results report {expected} corrupted answers.")
     print(f"Annotation CSV: {csv_path}")
     print(f"Readable review: {markdown_path}")
+    print(f"Extracted {len(fixed)} fixed answers for k={k}.")
+    expected_fixed = run["rag_by_k"][str(k)].get("fixed_answers")
+    if expected_fixed is not None and expected_fixed != len(fixed):
+        print(f"Warning: aggregate results report {expected_fixed} fixed answers.")
+    print(f"Fixed-answer annotation CSV: {fixed_csv_path}")
+    print(f"Fixed-answer readable review: {fixed_markdown_path}")
 
 
 if __name__ == "__main__":
