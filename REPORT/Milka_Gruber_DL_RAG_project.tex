@@ -1,0 +1,341 @@
+\documentclass{article}
+\pdfpagewidth=8.5in
+\pdfpageheight=11in
+\usepackage{ijcai19}
+
+% Use the postscript times font!
+\usepackage{times}
+\usepackage{soul}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\usepackage[utf8]{inputenc}
+\usepackage[small]{caption}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+\urlstyle{same}
+
+\title{Deep learning project - RAG for Biomedical Question Answering}
+
+\author{
+Milka Gruber (27242045)
+}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+The objective of this project was to implement and evaluate a retrieval-augmented
+generation (RAG) pipeline for biomedical multiple-choice question answering. The
+central question was whether external information retrieved from a medical textbook corpus can
+improve the answers of a relatively small open-source large language model (LLM).
+
+The experiment uses \path{Qwen/Qwen2.5-1.5B-Instruct} as the LLM baseline,
+\path{sentence-transformers/all-MiniLM-L6-v2} as the dense retriever, the
+\path{MedRAG/textbooks} dataset as the external knowledge base, and the validation split
+of \path{openlifescienceai/medmcqa} as the evaluation set. For this project
+the dataset MedMCQA was chosen, as it is a dataset of multiple-choice questions,
+which make the correctness of the results easier to evaluate. 
+
+
+\section{RAG pipeline}
+
+\subsection{Data and experiment configuration}
+
+All the parameters used in the RAG pipeline are first read from a JSON configuration file.
+They include the embedding and generation models, the number of questions and
+textbook chunks used, the tested $k$ values, retrieval-query format, input-token limit,
+random seed, and output paths. 
+
+The corpus is formed from the training split of \texttt{MedRAG/textbooks}.
+The full dataset consists of articles from Wikipedia, PubMed, StatPears and textbooks.
+For this project I choose to use textbooks only, as it is the smallest part of the dataset.
+
+The training split of the dataset is already preprocessed into chunks. 
+Each chunk consists of an identifier, title, content and a text combined of title and the content. 
+There are 125847 chunks in this dataset. 
+
+Questions for evaluation come from the MedMCQA validation split of size 4183 questions.
+Each entry consists of an identifier, question, four possible answers, 
+the correct numerical answer to the question, choice type, explanation, subject name and the name of the topic.
+All questions have a single answer reported as the correct one, so we treat the entire set
+as a single answer type of question.
+
+\subsection{Embeddings}
+
+The text of every textbook chunk is encoded by all-MiniLM-L6-v2,
+which is a sentence-transformer model that embedds short paragraphs
+into a 384-dimensional vector space. 
+The basic RAG pipeline consists of embedding both the textbook chunks
+and the question query. Top k most similar documents to the question query
+are retrieved and passed to the LMM, which generates the final answer.
+
+Both textbook chunks and question query embeddings are normalized, 
+so that similarity can be computed. These document embeddings are stored in
+a FAISS \texttt{IndexFlatIP} index, which is a data structure that stores high-dimensional
+vectors and optimizes for fast similarity search and nearest-neighbour retrieval.
+
+Building embeddings for the complete corpus is expensive, so the FAISS index is
+saved to disk (alongside it's metadata) and reused. 
+The saved index is loaded only when the metadata matches the current configuration,
+otherwise it is rebuilt.
+
+The inner product between normalized vectors is equivalent to cosine similarity.
+Thus, for a query vector $q$ and document vector
+$d_i$, retrieval ranks documents using
+\begin{equation}
+    s(q,d_i)=q^\top d_i=\cos(q,d_i).
+\end{equation}
+
+\subsection{Retrieval}
+I experimented with two retrieval query variants which are compared to the
+embedded documents for the most similar document retrieval.
+The first uses only the question text.
+The second concatenates the question and the text of all four answer options, but
+does not include the option labels A--D. For efficiency, the largest requested
+$k$ is retrieved only once per question and smaller-$k$ experiments use prefixes of
+that ranked list. 
+
+
+\subsection{Prompting and generation}
+
+The baseline prompt contains the question, four explicitly labelled options, and
+the instruction to answer with only one letter. The RAG prompt prepends the top-$k$
+retrieved chunks under a \emph{Context} heading and tells the model to use this
+textbook context. Both variants use the same system message: \emph{You are a
+medical question answering assistant.}
+
+Qwen is placed in evaluation mode so that inference runs without gradient calculation.
+The number of newly generated tokens is limited to 5.
+For these experiments, the configured maximum input length was 32,768 tokens.
+When the answer is generated, the original prompt tokens are removed from the
+sequence, and a regular expression extracts the first standalone letter (A, B, C or D).
+
+\subsection{Evaluation}
+
+Accuracy is computed for the baseline and independently for every value of $k$.
+This means that for each question and every k, separate answers are generated 
+based on the different number of documents that are passed to the LLM. 
+
+To show how retrieval changes model behaviour, the program additionally counts
+\emph{fixed} answers (baseline incorrect, RAG correct) and \emph{broken} answers
+(baseline correct, RAG incorrect). This distinction is useful because equal
+accuracies do not report enough information on changes in behaviour. 
+
+Every run is appended to JSON and plain-text result files.
+The JSON output preserves information per question:
+the correct answer, baseline and RAG predictions, outcome
+category, retrieval query, ranked passages, titles, similarity scores, and dataset
+metadata.
+
+\section{Results}
+We first ran the evaluation experiment on the entire 4183 MedMCQA validation set in 
+two retrieval modes (queries with and without answers to the question). 
+The results are shown in the Table~\ref{tab:full-results}. 
+The closed-book Qwen baseline answered 1,833 questions correctly.
+Overall the query with question and provided possible answers produced
+overall better results. 
+The best tested RAG setting for the question and answer query was $k=15$,
+which answered 1,967 correctly and improved absolute accuracy by 3.20 percentage points.
+The trends in both cases show that one retrieved document was insufficient
+for the model to generate the correct answer, in which case it actually hurt
+the performance. The performance in both query modes generally improved 
+as more context was supplied. 
+
+
+\begin{table}[!htb]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrrr}
+\toprule
+& \multicolumn{4}{c}{Question + answer options} &
+\multicolumn{4}{c}{Question only} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+Method & Correct & Accuracy & Fixed & Broken &
+Correct & Accuracy & Fixed & Broken \\
+\midrule
+Baseline     & 1833 & 43.82\% & -- & -- & 1833 & 43.82\% & -- & -- \\
+RAG ($k=1$)  & 1800 & 43.03\% & 522 & 555 & 1789 & 42.77\% & 447 & 491 \\
+RAG ($k=3$)  & 1902 & 45.47\% & 608 & 539 & 1864 & 44.56\% & 522 & 491 \\
+RAG ($k=5$)  & 1939 & 46.35\% & 630 & 524 & 1877 & 44.87\% & 556 & 512 \\
+RAG ($k=8$)  & 1958 & 46.81\% & 635 & 510 & 1912 & 45.71\% & 563 & 484 \\
+RAG ($k=10$) & 1943 & 46.45\% & 632 & 522 & 1907 & 45.59\% & 564 & 490 \\
+%RAG ($k=12$) & 1964 & 46.95\% & 662 & 531 & X & X\% & X & X \\
+RAG ($k=15$) & 1967 & 47.02\% & 660 & 526 & 1906 & 45.57\% & 590 & 517 \\
+%RAG ($k=18$) & X & X\% & X & X & 1918 & 45.85\% & 588 & 503 \\
+%RAG ($k=20$) & X & X\% & X & X & 1925 & 46.02\% & 583 & 491 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Results on the complete MedMCQA validation split for both retrieval-query
+modes. ``Fixed'' and ``Broken'' are measured relative to the closed-book baseline.}
+\label{tab:full-results}
+\end{table}
+
+
+\section{Retrieval analysis}
+The results support the main hypothesis: relevant external context can improve a
+small instruction-tuned model on biomedical questions, however this is too early to claim general improvement.
+We see that quite a large number of answers which were initially correctly 
+answered by Qwen, were later corrupted by RAG, which indicates that retrieval sometimes hurts correctness. 
+In order to improve the pipeline we have to diagnose the reason the answer got broken.
+
+I re-ran the entire pipeline for both retrieval cases on a smaller (n=500) random subsample of questions 
+and saved the retrieved passages for $k=15$. 
+I analyzed the retrieved passages manually and categorized the reason for failure in the following categories:
+\begin{itemize}
+    \item irrelevant retrieval: the retrieved passages were not related to the information needed for the question,
+    \item relevant but insufficient retrieval: the passages were related to the topic but did not contain enough information to answer correctly,
+    \item model ignored useful context: the correct information was retrieved, but the model did not use it,
+    \item context supports wrong option: the retrieved passages contained information that made an incorrect option seem correct,
+    \item ambiguous question / questionable correct answer in the dataset.
+\end{itemize}
+
+The reasons for fixed answers were categorized as follows:
+\begin{itemize}
+    \item direct answer found: the retrieved passages contained the correct answer,
+    \item useful supporting evidence: the retrieved passages contained information that helped the model to choose the correct answer,
+    \item multiple passages combined: the model combined information from multiple passages to arrive at the correct answer,
+    \item context helped reject a wrong option: the retrieved passages contained information that helped the model to reject an incorrect option,
+    \item correct despite weak retrieval: the model answered correctly even though the retrieved passages were not very useful,
+    \item ambiguous question / questionable correct answer in the dataset.
+\end{itemize}
+
+The run where query contained both the question and answers for k=15 on 500 evaluation question set produced 
+a 41\% accuracy for Qwen and 47.20\% accuracy for Qwen with RAG pipeline. 
+The RAG pipeline fixed 89 previously incorrect answers and broke 58 previously correct answers. 
+
+The run with question only query for k=15 on the same 500 evaluation question set as in the first case produced 
+a 41\% accuracy for Qwen and 44.20\% accuracy for Qwen with RAG pipeline. 
+The RAG pipeline fixed 72 previously incorrect answers and broke 56 previously correct answers. 
+
+\subsection{Analysis of corrupted answers}
+
+For each corrupted answer, all 15 retrieved passages were examined and one primary
+failure category was assigned (the categories are mutually exclusive).
+Table~\ref{tab:corruption-analysis} summarizes the analysis.
+
+\begin{table}[!htb]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrr}
+\toprule
+& \multicolumn{2}{c}{Question + answers} &
+\multicolumn{2}{c}{Question only} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Primary failure category & Count & Share & Count & Share \\
+\midrule
+Irrelevant retrieval                         & 11 & 19.0\% & 16 & 28.6\% \\
+Relevant but insufficient retrieval          & 17 & 29.3\% & 16 & 28.6\% \\
+Model ignored useful context                  & 14 & 24.1\% & 16 & 28.6\% \\
+Context supports wrong option                 & 11 & 19.0\% &  4 &  7.1\% \\
+Ambiguous question / questionable gold label  &  5 &  8.6\% &  4 &  7.1\% \\
+\midrule
+Total                                         & 58 & 100\%  & 56 & 100\%  \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Primary causes assigned to corrupted answers in the two 500-question
+experiments at $k=15$.}
+\label{tab:corruption-analysis}
+\end{table}
+
+The corruption analysis shows that the two query modes produced a similar number
+of broken answers: 58 for the question and answer query and 56 for the
+question-only query. In both modes, approximately 69\% of corrupted answers had
+no retrieved passage containing the information required for the correct answer
+(40 of 58 and 39 of 56, respectively).
+
+Further inspection suggested a corpus-coverage problem for dental questions.
+Dental questions accounted for 20 of the 58 corrupted answers. In 16 of these
+20 cases (80\%), the retrieved passages were either irrelevant or related to the
+topic but insufficient to answer the question. The retriever often returned
+general medical information or broad passages about teeth that did not contain
+the specialized dental facts required to distinguish between the answer options.
+%We identify the lack of information
+%that would inform the correct answer as the main reason for failure in both query modes.
+
+The distribution of types of failures differed between the two query modes. With question-only
+retrieval, the three most common problems were irrelevant passages, insufficient
+information, and the model ignoring useful passages. Each occurred in 16 of 56
+cases. Adding the answer options reduced irrelevant retrieval from
+28.6\% to 19.0\% and ignored useful context from 28.6\% to 24.1\%. However, it
+also increased cases where the passages supported a wrong answer from 7.1\% to
+19.0\%. Therefore, answer options can help retrieve more relevant information,
+but they can also direct the search toward an incorrect option. Overall, using
+the question and answer options produced higher accuracy, despite this risk.
+
+\subsection{Analysis of fixed answers}
+
+\begin{table}[!htb]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrr}
+\toprule
+& \multicolumn{2}{c}{Question + answers} &
+\multicolumn{2}{c}{Question only} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Primary reason for correction & Count & Share & Count & Share \\
+\midrule
+Direct answer found                              & 37 & 41.6\% & 23 & 31.9\% \\
+Useful supporting evidence                       &  9 & 10.1\% &  6 &  8.3\% \\
+Multiple passages combined                       &  2 &  2.2\% &  1 &  1.4\% \\
+Context helped reject a wrong option              &  9 & 10.1\% & 10 & 13.9\% \\
+Correct despite weak retrieval                    & 30 & 33.7\% & 30 & 41.7\% \\
+Ambiguous question / questionable gold label      &  2 &  2.2\% &  2 &  2.8\% \\
+\midrule
+Total                                             & 89 & 100\% & 72 & 100\%  \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Primary reasons assigned to fixed answers in the two 500-question
+experiments at $k=15$.}
+\label{tab:fixed-analysis}
+\end{table}
+
+The analysis of fixed answers also shows a difference between the two query
+modes. The question-and-answer query corrected 89 answers, while the
+question-only query corrected 72. With answer options included, direct answers
+were found in the retrieved passages in 37 cases (41.6\%), compared with 23 cases
+(31.9\%) for question-only retrieval. This suggests that answer options helped
+the retriever find passages containing the required information.
+
+However, 30 answers were corrected despite weak retrieval in both modes. This
+represented 33.7\% of corrections for the question-and-answer query and 41.7\%
+for the question-only query. In these cases, the model probably relied more on
+its existing knowledge or guessed correctly than on the retrieved passages.
+The remaining corrections came from supporting evidence, combining passages,
+or using context to reject a wrong option. Overall, including the answer options
+produced more corrected answers and more cases where the correct answer was
+directly supported by the retrieved text.
+
+\section{Further work}
+Based on the analysis results, we can determine that the query mode with
+both the question and answers is more beneficial to the RAG pipeline, 
+so any further work shall focus on this query mode. 
+
+We identified the lack of information that would inform the correct answer
+as the main reason for failure in both query modes. This could be fixed by improving the corpus coverage,
+for example by adding wikipedia articles from the same dataset.
+
+The issue where the retrieved passages confused the model into choosing a wrong answer
+could be helped by reranking the retrieved passages based on their relevance to the question and answer options.
+
+Trying out different LMMs and embedding models could also improve the results. 
+Because specific words in medicine can have different meanings across subfields, it is 
+important for the embedding model to be able to determine the context of the words to understand the correct meaning. 
+This could be achieved by using a domain-specific embedding model.
+
+
+
+
+\end{document}
