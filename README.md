@@ -69,4 +69,4 @@ Two main settings are compared:
 The `analysis_of_500_questions/` directory contains results and error analysis for a subset of **500 MedMCQA questions**. It compares baseline and RAG predictions and examines cases where retrieval either **corrected an incorrect baseline answer or changed a correct answer into an incorrect one**. These cases were manually reviewed to determine whether relevant information was present in the retrieved documents and to better understand the source of the errors.
 
 ## Report
-A detailed description of the methodology, experiments, results, and analysis can be found in the [**project report**](./report.pdf).
+A detailed description of the methodology, experiments, results, and analysis can be found in the **Milka_Gruber_project_REPORT.pdf** file.
