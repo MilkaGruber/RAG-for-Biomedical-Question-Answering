@@ -1,0 +1,35 @@
+
+============================================================
+RUN TIME: 2026-08-20T21:28:14.396620+02:00
+
+EXPERIMENT PARAMETERS
+----------------------------
+embedding_model: sentence-transformers/all-MiniLM-L6-v2
+model_name: Qwen/Qwen2.5-1.5B-Instruct
+num_questions: 500
+num_documents: None
+top_k_values: [15]
+question_only: False
+document_field: content
+max_input_tokens: 32768
+baseline_cache_file: baseline_predictions.json
+seed: 42
+index_file: textbook_faiss.index
+results_file: rag_results.json
+resolved_index_file: textbook_faiss.sentence-transformers_all-MiniLM-L6-v2.content.index
+resolved_baseline_cache_file: baseline_predictions.Qwen_Qwen2.5-1.5B-Instruct.json
+
+COMPARISON RESULTS
+----------------------------
+Questions:           500
+Qwen correct:        205
+Qwen accuracy:       41.00%
+Qwen invalid outputs: 0
+
+RAG k=15
+Correct:             236
+Accuracy:            47.20%
+Accuracy difference: 6.20%
+Fixed answers:       89
+Broke answers:       58
+Invalid outputs:     0
