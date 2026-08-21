@@ -1,0 +1,93 @@
+RAG CORRUPTION REVIEW COUNTS
+========================================================================
+------------------------------------------------------------------------
+File:        rag_corruption_review_fixed_QO_false.csv
+QO setting:  false
+Result type: successful RAG answers
+Total rows:  89
+
+Success category:
+  direct answer found                             37
+  correct despite weak retrieval                  30
+  context helped reject a wrong option             9
+  useful supporting evidence                       9
+  ambiguous question / questionable gold label     2
+  multiple passages combined                       2
+
+Supporting document rank:
+  1                                               24
+  2                                               13
+  3                                                9
+  4                                                5
+  5                                                5
+  7                                                5
+  6                                                3
+  11                                               3
+  12                                               3
+  13                                               3
+  8                                                2
+  10                                               2
+  14                                               2
+  15                                               1
+------------------------------------------------------------------------
+File:        rag_corruption_review_QO_false.csv
+QO setting:  false
+Result type: failed RAG answers
+Total rows:  58
+
+Failure category:
+  relevant but insufficient retrieval             17
+  model ignored useful context                    14
+  context supports wrong option                   11
+  irrelevant retrieval                            11
+  ambiguous question / questionable gold label     5
+
+Retrieval contains answer:
+  no                                              40
+  yes                                             18
+------------------------------------------------------------------------
+File:        rag_corruption_review_fixed_QO_true.csv
+QO setting:  true
+Result type: successful RAG answers
+Total rows:  72
+
+Success category:
+  correct despite weak retrieval                  30
+  direct answer found                             23
+  context helped reject a wrong option            10
+  useful supporting evidence                       6
+  ambiguous question / questionable gold label     2
+  multiple passages combined                       1
+
+Supporting document rank:
+  1                                               20
+  2                                               15
+  3                                                8
+  4                                                7
+  5                                                6
+  6                                                5
+  10                                               5
+  13                                               5
+  15                                               5
+  9                                                4
+  7                                                3
+  8                                                3
+  11                                               3
+  12                                               3
+  14                                               2
+------------------------------------------------------------------------
+File:        rag_corruption_review_QO_true.csv
+QO setting:  true
+Result type: failed RAG answers
+Total rows:  56
+
+Failure category:
+  irrelevant retrieval                            16
+  model ignored useful context                    16
+  relevant but insufficient retrieval             16
+  ambiguous question / questionable gold label     4
+  context supports wrong option                    4
+
+Retrieval contains answer:
+  no                                              39
+  yes                                             17
