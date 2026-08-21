@@ -1,9 +1,9 @@
 {
   "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
   "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
-  "num_questions": 500,
+  "num_questions": null,
   "num_documents": null,
-  "top_k_values": [15],
+  "top_k_values": [18, 20, 30],
   "question_only": false,
   "document_field": "content",
   "max_input_tokens": 32768,
